@@ -6,7 +6,7 @@ require (
 	github.com/bitly/go-simplejson v0.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.11.1
-	github.com/yylego/runpath v0.0.0
+	github.com/yylego/runpath v0.0.7
 	github.com/yylego/sure v0.0.0
 )
 

@@ -40,6 +40,104 @@ func TestExtract_Mismatch(t *testing.T) {
 	require.Equal(t, 0, res)
 }
 
+// TestSolicit_NonZeroInt tests Solicit function returns non-zero int value
+// TestSolicit_NonZeroInt 测试 Solicit 函数返回非零 int 值
+func TestSolicit_NonZeroInt(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"age": 18
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[int](object, "age")
+	require.NoError(t, err)
+	t.Log(res)
+	require.Equal(t, 18, res)
+}
+
+// TestSolicit_ZeroInt tests Solicit function rejects zero int value
+// TestSolicit_ZeroInt 测试 Solicit 函数拒绝零值 int
+func TestSolicit_ZeroInt(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"count": 0
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[int](object, "count")
+	require.Error(t, err)
+	t.Log(err)
+	require.Equal(t, 0, res)
+}
+
+// TestSolicit_EmptyString tests Solicit function rejects empty string value
+// TestSolicit_EmptyString 测试 Solicit 函数拒绝空字符串值
+func TestSolicit_EmptyString(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"name": ""
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[string](object, "name")
+	require.Error(t, err)
+	t.Log(err)
+	require.Equal(t, "", res)
+}
+
+// TestSolicit_NonZeroString tests Solicit function returns non-empty string value
+// TestSolicit_NonZeroString ��试 Solicit 函数返回非空字符串值
+func TestSolicit_NonZeroString(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"name": "yylego"
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[string](object, "name")
+	require.NoError(t, err)
+	t.Log(res)
+	require.Equal(t, "yylego", res)
+}
+
+// TestSolicit_FalseBool tests Solicit function rejects false boolean value
+// TestSolicit_FalseBool 测试 Solicit 函数拒绝 false 布尔值
+func TestSolicit_FalseBool(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"active": false
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[bool](object, "active")
+	require.Error(t, err)
+	t.Log(err)
+	require.Equal(t, false, res)
+}
+
+// TestSolicit_MissingKey tests Solicit function rejects missing key
+// TestSolicit_MissingKey ����� Solicit 函数拒绝缺失的键
+func TestSolicit_MissingKey(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"name": "yylego"
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[int](object, "age")
+	require.Error(t, err)
+	t.Log(err)
+	require.Equal(t, 0, res)
+}
+
+// TestSolicit_NullValue tests Solicit function rejects null value
+// TestSolicit_NullValue 测试 Solicit 函数拒绝 null 值
+func TestSolicit_NullValue(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"name": null
+	}`))
+	require.NoError(t, err)
+
+	res, err := simplejsonx.Solicit[string](object, "name")
+	require.Error(t, err)
+	t.Log(err)
+	require.Equal(t, "", res)
+}
+
 // TestInspect tests Inspect function with existing key
 // TestInspect 测试 Inspect 函数处理存在的键
 func TestInspect(t *testing.T) {

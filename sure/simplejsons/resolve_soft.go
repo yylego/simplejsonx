@@ -17,6 +17,12 @@ func Extract[T any](object *simplejson.Json, key string) T {
 	return res0
 }
 
+func Solicit[T comparable](object *simplejson.Json, key string) T {
+	res0, err := simplejsonx.Solicit[T](object, key)
+	sure.Soft(err)
+	return res0
+}
+
 func Inspect[T any](object *simplejson.Json, key string) T {
 	res0, err := simplejsonx.Inspect[T](object, key)
 	sure.Soft(err)

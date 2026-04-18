@@ -1,14 +1,16 @@
 // Package simplejsonx: Type-safe JSON parsing engine with Go generics support
 // Built on github.com/bitly/go-simplejson with enhanced compile-time type-safe checking
-// Provides Extract, Inspect, Resolve functions enabling safe conversion to 13+ types
+// Provides Extract, Inspect, Resolve, Inquire, Attempt, Harvest, Explore functions
+// Each function offers a different level of strictness for field validation
 // Supports primitives, lists, maps, and nested JSON objects with zero-cost type checking
-// Features code-generated exception handling variants in must/omit/soft modes
+// Features code-generated error handling variants in must/omit/soft sub-packages
 //
 // simplejsonx: 类型安全的 JSON 解析引擎，支持 Go 泛型
 // 基于 github.com/bitly/go-simplejson 构建，具有增强的编译时类型安全性
-// 提供 Extract、Inspect、Resolve 函数，实现安全转换到 13+ 种类型
+// 提供 Extract、Inspect、Resolve、Inquire、Attempt、Harvest、Explore 函数
+// 每个函数提供不同的严格程度，精确控制字段校验
 // 支持基础类型、数组、映射和嵌套 JSON 对象，具有零成本类型检查
-// 具有代码生成的错误处理变体，包含 must/omit/soft 模式
+// 具有代码生成的错误处理变体，包含 must/omit/soft 子包
 package simplejsonx
 
 import (
@@ -34,6 +36,24 @@ func Extract[T any](object *simplejson.Json, key string) (T, error) {
 		return utils.Zero[T](), errors.New("Extract: param key is blank")
 	}
 	return Resolve[T](object.Get(key))
+}
+
+// Solicit retrieves and parses the value at the specified key with non-zero validation
+// Returns errors when the key is missing, when type conversion fails, or when the value is zero
+// Goes beyond Extract: rejects zero values (0, "", false) in addition to missing/null/wrong-type
+//
+// Solicit 检索指定键的值并解析成目标类型，同时校验非零值
+// 当键缺失、类型转换失败、或值为零值时返回错误
+// 比 Extract 更严格：除了缺失/null/类型不对之外，零值（0、""、false）也会报错
+func Solicit[T comparable](object *simplejson.Json, key string) (T, error) {
+	res, err := Extract[T](object, key)
+	if err != nil {
+		return res, errors.WithMessage(err, "Solicit: unable to extract value from JSON object")
+	}
+	if res == utils.Zero[T]() {
+		return res, errors.Errorf("Solicit: key %q value is zero, expected non-zero", key)
+	}
+	return res, nil
 }
 
 // Inspect retrieves and parses the value at the specified key when present
