@@ -1,6 +1,6 @@
 // Code generated using sure/sure_pkg_gen. DO NOT EDIT.
 // This file was auto generated via github.com/yylego/sure
-// Generated from: testing.go:2036 -> testing.tRunner
+// Generated from: zero_tern.go:31 -> zerotern.VF[...]
 // ========== SURE:DO-NOT-EDIT-SECTION:END ==========
 
 package simplejsonm

@@ -1,15 +1,15 @@
 // Package simplejsonx: Type-safe JSON parsing engine with Go generics support
-// Built on github.com/bitly/go-simplejson with enhanced compile-time type-safe checking
+// Built on github.com/bitly/go-simplejson with typed results and runtime validation
 // Provides Extract, Inspect, Resolve, Inquire, Attempt, Harvest, Explore functions
-// Each function offers a different level of strictness for field validation
-// Supports primitives, lists, maps, and nested JSON objects with zero-cost type checking
+// Each function offers a different degree of strictness in field validation
+// Supports primitives, lists, maps, and nested JSON objects
 // Features code-generated error handling variants in must/omit/soft sub-packages
 //
 // simplejsonx: 类型安全的 JSON 解析引擎，支持 Go 泛型
-// 基于 github.com/bitly/go-simplejson 构建，具有增强的编译时类型安全性
+// 基于 github.com/bitly/go-simplejson 构建，提供确定类型的返回值与运行时校验
 // 提供 Extract、Inspect、Resolve、Inquire、Attempt、Harvest、Explore 函数
 // 每个函数提供不同的严格程度，精确控制字段校验
-// 支持基础类型、数组、映射和嵌套 JSON 对象，具有零成本类型检查
+// 支持基础类型、数组、映射和嵌套 JSON 对象
 // 具有代码生成的错误处理变体，包含 must/omit/soft 子包
 package simplejsonx
 
@@ -69,6 +69,9 @@ func Inspect[T any](object *simplejson.Json, key string) (T, error) {
 	}
 	if key == "" {
 		return utils.Zero[T](), errors.New("Inspect: param key is blank")
+	}
+	if _, err := object.Map(); err != nil {
+		return utils.Zero[T](), errors.Wrapf(err, "Inspect: key %q requires a JSON object", key)
 	}
 	value, exist := object.CheckGet(key)
 	if !exist {
@@ -191,11 +194,13 @@ func GetList(object *simplejson.Json, key string) (objects []*simplejson.Json, e
 }
 
 // Inquire queries JSON object at the specified key with tri-state result pattern
-// Returns parsed value, existence boolean, and possible conversion errors
+// Returns (value, true, nil) on success and (zero, false, nil) on absent keys
+// Errors return (zero, false, err); check err before interpreting the flag
 // Distinguishes between missing keys and type conversion failures
 //
 // Inquire 查询 JSON 对象中指定键的值，使用三态结果模式
-// 返回解析后的值、存在性布尔值和可能的转换错误
+// 成功返回 (值, true, nil)，缺键返回 (零值, false, nil)
+// 出错返回 (零值, false, err)；应先检查 err，再判断布尔值
 // 区分缺失的键和类型转换失败的情况
 func Inquire[T any](object *simplejson.Json, key string) (T, bool, error) {
 	if object == nil {
@@ -203,6 +208,9 @@ func Inquire[T any](object *simplejson.Json, key string) (T, bool, error) {
 	}
 	if key == "" {
 		return utils.Zero[T](), false, errors.New("Inquire: param key is blank")
+	}
+	if _, err := object.Map(); err != nil {
+		return utils.Zero[T](), false, errors.Wrapf(err, "Inquire: key %q requires a JSON object", key)
 	}
 	value, exist := object.CheckGet(key)
 	if !exist {
@@ -242,11 +250,11 @@ func Attempt[T any](object *simplejson.Json, key string) (T, bool) {
 
 // Explore navigates nested JSON structure via dot-separated path notation
 // Traverses multiple levels using path like "user.profile.name"
-// Returns parsed value, existence boolean, and possible conversion errors
+// Uses the same result convention as Inquire; each path segment requires a JSON object
 //
 // Explore 通过点分隔路径表示法导航嵌套 JSON 结构
 // 使用类似 "user.profile.name" 的路径遍历多层级结构
-// 返回解析后的值、存在性布尔值和可能的转换错误
+// 返回值约定与 Inquire 相同；每段路径的取值对象必须是 JSON 对象
 func Explore[T any](object *simplejson.Json, path string) (T, bool, error) {
 	if object == nil {
 		return utils.Zero[T](), false, errors.New("Explore: param object is nil")
@@ -257,6 +265,9 @@ func Explore[T any](object *simplejson.Json, path string) (T, bool, error) {
 	value := object
 	var exist bool
 	for _, key := range strings.Split(path, ".") {
+		if _, err := value.Map(); err != nil {
+			return utils.Zero[T](), false, errors.Wrapf(err, "Explore: path %q segment %q requires a JSON object", path, key)
+		}
 		value, exist = value.CheckGet(key)
 		if !exist {
 			return utils.Zero[T](), false, nil
@@ -269,7 +280,7 @@ func Explore[T any](object *simplejson.Json, path string) (T, bool, error) {
 	return res, true, nil
 }
 
-// HarvestOption configures mixed-type field parsing behavior
+// HarvestOption configures mixed-type field parsing settings
 // Enables flexible handling when JSON fields may contain numbers, strings, or null
 // Used with Harvest function to customize extraction and conversion rules
 //
@@ -277,33 +288,43 @@ func Explore[T any](object *simplejson.Json, path string) (T, bool, error) {
 // 当 JSON 字段可能包含数字、字符串或 null 时启用灵活处理
 // 与 Harvest 函数配合使用，用于自定义提取和转换规则
 type HarvestOption[T any] struct {
-	Nilable bool                    // Accept null values without error // 接受 null 值不报错
-	Strconv func(string) (T, error) // Custom string conversion function // 自定义字符串转换函数
+	AbsentOk bool                    // Accept absent keys as zero values // 缺键时返回零值，不影响 null 与类型校验
+	Nullable bool                    // Accept null values and nil objects as zero values // null 值或 nil 对象返回零值
+	Strconv  func(string) (T, error) // Custom string conversion function // 自定义字符串转换函数
 }
 
 // Harvest extracts mixed-type fields with configurable null and string handling
 // Designed to handle JSON fields that may contain numbers, strings like "-", or null
-// Uses HarvestOption to customize behavior: Nilable allows null, Strconv converts strings
+// Uses HarvestOption to customize settings: Nullable accepts null, AbsentOk accepts absent keys, Strconv converts strings
 //
 // Harvest 提取混合类型字段，支持可配置的 null 和字符串处理
 // 设计用于处理可能包含数字、字符串（如 "-"）或 null 的 JSON 字段
-// 使用 HarvestOption 自定义行为：Nilable 允许 null，Strconv 转换字符串
+// 使用 HarvestOption 自定义行为：Nullable 允许 null，AbsentOk 允许缺键，Strconv 转换字符串
 func Harvest[T any](object *simplejson.Json, key string, option *HarvestOption[T]) (T, error) {
+	if key == "" {
+		return utils.Zero[T](), errors.New("Harvest: param key is blank")
+	}
+	if option == nil {
+		option = &HarvestOption[T]{}
+	}
 	if object == nil {
-		if option.Nilable {
+		if option.Nullable {
 			return utils.Zero[T](), nil
 		}
 		return utils.Zero[T](), errors.New("Harvest: param object is nil")
 	}
-	if key == "" {
-		return utils.Zero[T](), errors.New("Harvest: param key is blank")
+	if _, err := object.Map(); err != nil {
+		return utils.Zero[T](), errors.Wrapf(err, "Harvest: key %q requires a JSON object", key)
 	}
 	value, exist := object.CheckGet(key)
 	if !exist {
+		if option.AbsentOk {
+			return utils.Zero[T](), nil
+		}
 		return utils.Zero[T](), errors.Errorf("Harvest: key %q not found in JSON object", key)
 	}
 	if value == nil || value.Interface() == nil {
-		if option.Nilable {
+		if option.Nullable {
 			return utils.Zero[T](), nil
 		}
 		return utils.Zero[T](), errors.Errorf("Harvest: key %q value is null in JSON object", key)

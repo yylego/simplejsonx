@@ -36,7 +36,7 @@ func main() {
 	// Define harvest option with mixed-type handling
 	// 定义收获选项，处理混合类型
 	option := &simplejsonx.HarvestOption[float64]{
-		Nilable: true, // Accept null values // 接受 null 值
+		Nullable: true, // Accept null values // 接受 null 值
 		Strconv: func(s string) (float64, error) {
 			if s == "-" || s == "N/A" {
 				return 0, nil // Treat "-" as zero // 将 "-" 视为零值

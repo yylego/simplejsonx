@@ -1,6 +1,8 @@
 package simplejsonx
 
 import (
+	"encoding/json"
+
 	"github.com/bitly/go-simplejson"
 	"github.com/pkg/errors"
 )
@@ -13,7 +15,10 @@ import (
 // 将字节数据解析成结构化的 JSON 对象表示
 // 当 JSON 解析失败时返回带上下文的错误
 func Load(data []byte) (object *simplejson.Json, err error) {
-	object, err = simplejson.NewJson(data)
+	object = simplejson.New()
+	// Validate the complete document before invoking Json.UnmarshalJSON.
+	// 先校验整个文档，再调用 Json.UnmarshalJSON，保留其 json.Number 精度。
+	err = json.Unmarshal(data, object)
 	if err != nil {
 		return simplejson.New(), errors.WithMessage(err, "Load: unable to parse JSON data")
 	}

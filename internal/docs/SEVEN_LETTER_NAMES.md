@@ -1,39 +1,7 @@
-# SEVEN LETTER Function Names
+# Function Naming
 
-Harvest 函数名的7个字母命名推荐表
+The extraction API uses verbs with seven letters: `Extract`, `Solicit`, `Inspect`, `Resolve`, `Inquire`, `Attempt`, `Explore`, and `Harvest`. Each verb describes a distinct extraction contract. Precise meaning takes precedence; fixed length is a preference.
 
-## 推荐命名表
+`Harvest` means collecting a usable value from a field with mixed representations. Its options define which absent / null inputs are accepted and how strings are converted. It still validates the input according to those options.
 
-| 单词          | 含义    | 语义倾向                |
-|-------------|-------|---------------------|
-| **Harvest** | 收获、收割 | 从混杂数据中"收割"有效值 ✅ 已采纳 |
-| **Acquire** | 获取、取得 | 主动获取目标值             |
-| **Procure** | 获得、弄到 | 想办法弄到需要的值           |
-| **Capture** | 捕获、捕捉 | 从不确定类型中"捕获"正确值      |
-| **Salvage** | 抢救、挽救 | 从混乱数据中"抢救"出有效值      |
-| **Embrace** | 包容、接纳 | 包容多种类型的输入           |
-| **Collect** | 收集、采集 | 收集并整理数据             |
-| **Reclaim** | 回收、取回 | 从混杂状态中"回收"正确值       |
-| **Convert** | 转换、转化 | 强调类型转换过程            |
-| **Squeeze** | 挤出、榨取 | 从数据中"挤出"有效值         |
-| **Conjure** | 变出、召唤 | 像魔法般变出正确类型          |
-| **Consume** | 消费、消化 | 消化处理各种输入格式          |
-| **Unearth** | 发掘、挖出 | 从数据中"挖掘"出正确值        |
-| **Venture** | 冒险尝试  | 尝试性地解析不确定数据         |
-| **Examine** | 检查、审视 | 检查并提取正确类型           |
-
-## 推荐度排序
-
-1. **Harvest** - 最佳选择，"收获"的意象非常契合从混杂数据中提取有效值
-2. **Salvage** - 次佳，"抢救"强调从不完美数据中挽救出有效值
-3. **Capture** - 优秀，"捕获"暗示从不确定中抓取正确类型
-4. **Procure** - 良好，"弄到"有种想尽办法获取的感觉
-5. **Acquire** - 良好，通用的"获取"含义
-
-## 使用场景
-
-这些命名适用于处理混合类型 JSON 字段的函数，例如：
-
-- 字段可能是浮点数，也可能是 "-" 字符串表示无值
-- 字段可能存在但值为 null
-- 需要灵活处理多种输入格式并提取有效值
+Option names follow the intended meaning: `AbsentOk` accepts absent fields, and `Nullable` refers to JSON null. These names need not match the verb length. See the README and `HarvestOption` comments to check exact semantics.

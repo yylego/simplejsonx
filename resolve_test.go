@@ -628,7 +628,7 @@ func TestExploreGetList(t *testing.T) {
 	}
 }
 
-// TestHarvest_Float64 tests Harvest function with normal float64 value
+// TestHarvest_Float64 tests Harvest function with standard float64 value
 // TestHarvest_Float64 测试 Harvest 函数处理正常的 float64 值
 func TestHarvest_Float64(t *testing.T) {
 	// Test normal float64 value
@@ -644,36 +644,36 @@ func TestHarvest_Float64(t *testing.T) {
 	require.Equal(t, 123.45, res)
 }
 
-// TestHarvest_NullWithNilable tests Harvest function accepting null with Nilable=true
-// TestHarvest_NullWithNilable 测试 Harvest 函数在 Nilable=true 时接受 null 值
-func TestHarvest_NullWithNilable(t *testing.T) {
-	// Test null value with Nilable=true
-	// 测试 null 值且 Nilable=true
+// TestHarvest_NullWithNullable tests Harvest function accepting null with Nullable=true
+// TestHarvest_NullWithNullable 测试 Harvest 函数在 Nullable=true 时接受 null 值
+func TestHarvest_NullWithNullable(t *testing.T) {
+	// Test null value with Nullable=true
+	// 测试 null 值且 Nullable=true
 	object, err := simplejsonx.Load([]byte(`{
 		"price": null
 	}`))
 	require.NoError(t, err)
 
 	res, err := simplejsonx.Harvest[float64](object, "price", &simplejsonx.HarvestOption[float64]{
-		Nilable: true,
+		Nullable: true,
 	})
 	require.NoError(t, err)
 	t.Log(res)
 	require.Equal(t, float64(0), res)
 }
 
-// TestHarvest_NullWithoutNilable tests Harvest function rejecting null with Nilable=false
-// TestHarvest_NullWithoutNilable 测试 Harvest 函数在 Nilable=false 时拒绝 null 值
-func TestHarvest_NullWithoutNilable(t *testing.T) {
-	// Test null value with Nilable=false
-	// 测试 null 值且 Nilable=false
+// TestHarvest_NullWithoutNullable tests Harvest function rejecting null with Nullable=false
+// TestHarvest_NullWithoutNullable 测试 Harvest 函数在 Nullable=false 时拒绝 null 值
+func TestHarvest_NullWithoutNullable(t *testing.T) {
+	// Test null value with Nullable=false
+	// 测试 null 值且 Nullable=false
 	object, err := simplejsonx.Load([]byte(`{
 		"price": null
 	}`))
 	require.NoError(t, err)
 
 	res, err := simplejsonx.Harvest[float64](object, "price", &simplejsonx.HarvestOption[float64]{
-		Nilable: false,
+		Nullable: false,
 	})
 	require.Error(t, err)
 	t.Log(err)
@@ -723,7 +723,7 @@ func TestHarvest_MixedTypes(t *testing.T) {
 	require.Len(t, items, 3)
 
 	option := &simplejsonx.HarvestOption[float64]{
-		Nilable: true,
+		Nullable: true,
 		Strconv: func(s string) (float64, error) {
 			if s == "-" || s == "N/A" {
 				return 0, nil
@@ -773,7 +773,7 @@ func TestHarvest_KeyNotFound(t *testing.T) {
 	require.Equal(t, float64(0), res)
 }
 
-// TestHarvest_EmptyKey tests Harvest function with empty key parameter
+// TestHarvest_EmptyKey tests Harvest function with blank key input
 // TestHarvest_EmptyKey 测试 Harvest 函数处理空键参数
 func TestHarvest_EmptyKey(t *testing.T) {
 	// Test empty key scenario
@@ -787,4 +787,31 @@ func TestHarvest_EmptyKey(t *testing.T) {
 	require.Error(t, err)
 	t.Log(err)
 	require.Equal(t, float64(0), res)
+	_, err = simplejsonx.Harvest[int](nil, "", &simplejsonx.HarvestOption[int]{Nullable: true})
+	require.Error(t, err)
+}
+
+func TestFieldObjectShape(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`[]`))
+	require.NoError(t, err)
+	_, err = simplejsonx.Inspect[int](object, "amount")
+	require.Error(t, err)
+	_, _, err = simplejsonx.Inquire[int](object, "amount")
+	require.Error(t, err)
+	_, err = simplejsonx.Harvest[int](object, "amount", &simplejsonx.HarvestOption[int]{AbsentOk: true, Nullable: true})
+	require.Error(t, err)
+	_, _, err = simplejsonx.Explore[int](object, "amount")
+	require.Error(t, err)
+}
+
+func TestExploreObjectShape(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{"item":42}`))
+	require.NoError(t, err)
+	_, _, err = simplejsonx.Explore[int](object, "item.amount")
+	require.Error(t, err)
+	object, err = simplejsonx.Load([]byte(`{"item":{}}`))
+	require.NoError(t, err)
+	_, ok, err := simplejsonx.Explore[int](object, "item.amount")
+	require.NoError(t, err)
+	require.False(t, ok)
 }

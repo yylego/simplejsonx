@@ -42,6 +42,20 @@ func TestLoad_EmptyInput(t *testing.T) {
 	require.NotNil(t, object)
 }
 
+func TestLoadCompleteJSON(t *testing.T) {
+	// Reject a second document and an unmatched closing bracket.
+	// 拒绝拼接的第二个文档，以及末尾多出的右括号。
+	for _, data := range []string{`{} {}`, `{"amount":1}]`} {
+		_, err := simplejsonx.Load([]byte(data))
+		require.Error(t, err)
+	}
+	object, err := simplejsonx.Load([]byte("{\"amount\":9007199254740993}\n\t"))
+	require.NoError(t, err)
+	value, err := simplejsonx.Extract[int64](object, "amount")
+	require.NoError(t, err)
+	require.Equal(t, int64(9007199254740993), value)
+}
+
 // TestWrap tests Wrap function with map data structure
 // TestWrap 测试 Wrap 函数包装 map 数据结构
 func TestWrap(t *testing.T) {

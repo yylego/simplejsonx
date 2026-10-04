@@ -1,4 +1,4 @@
-// Package utils provides utility functions for simplejsonx generic operations.
+// Package utils provides tools and helpers used in simplejsonx generic operations.
 //
 // utils 包为 simplejsonx 泛型操作提供实用工具函数
 package utils
