@@ -1,19 +1,20 @@
 // Package simplejsonx: Type-safe JSON parsing engine with Go generics support
 // Built on github.com/bitly/go-simplejson with typed results and runtime validation
-// Provides Extract, Inspect, Resolve, Inquire, Attempt, Harvest, Explore functions
+// Provides Extract, Solicit, Inspect, Resolve, Inquire, Attempt, Harvest, Numeric, Explore functions
 // Each function offers a different degree of strictness in field validation
 // Supports primitives, lists, maps, and nested JSON objects
 // Features code-generated error handling variants in must/omit/soft sub-packages
 //
 // simplejsonx: 类型安全的 JSON 解析引擎，支持 Go 泛型
 // 基于 github.com/bitly/go-simplejson 构建，提供确定类型的返回值与运行时校验
-// 提供 Extract、Inspect、Resolve、Inquire、Attempt、Harvest、Explore 函数
+// 提供 Extract、Solicit、Inspect、Resolve、Inquire、Attempt、Harvest、Numeric、Explore 函数
 // 每个函数提供不同的严格程度，精确控制字段校验
 // 支持基础类型、数组、映射和嵌套 JSON 对象
 // 具有代码生成的错误处理变体，包含 must/omit/soft 子包
 package simplejsonx
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -22,11 +23,11 @@ import (
 )
 
 // Extract retrieves and parses the value at the specified key into the target type
-// Returns errors when the key is missing, when type conversion fails
+// The key must exist and the value must not be null; use Inspect when the key can be absent
 // Supports automatic type conversion based on generic type parameters
 //
 // Extract 检索指定键的值并解析成目标类型
-// 当键缺失或类型转换失败时返回错误
+// 键必须存在、值不能是 null；键可以缺时用 Inspect
 // 支持基于泛型类型参数的自动类型转换
 func Extract[T any](object *simplejson.Json, key string) (T, error) {
 	if object == nil {
@@ -35,15 +36,22 @@ func Extract[T any](object *simplejson.Json, key string) (T, error) {
 	if key == "" {
 		return utils.Zero[T](), errors.New("Extract: param key is blank")
 	}
-	return Resolve[T](object.Get(key))
+	if _, err := object.Map(); err != nil {
+		return utils.Zero[T](), errors.Wrapf(err, "Extract: key %q requires a JSON object", key)
+	}
+	// CheckGet tells a missing key apart from a null value, so the error names the cause as it is
+	// CheckGet 能分清缺键和值为 null，报错时写对原因
+	value, exist := object.CheckGet(key)
+	if !exist {
+		return utils.Zero[T](), errors.Errorf("Extract: key %q not found in JSON object", key)
+	}
+	return Resolve[T](value)
 }
 
 // Solicit retrieves and parses the value at the specified key with non-zero validation
-// Returns errors when the key is missing, when type conversion fails, or when the value is zero
 // Goes beyond Extract: rejects zero values (0, "", false) in addition to missing/null/wrong-type
 //
 // Solicit 检索指定键的值并解析成目标类型，同时校验非零值
-// 当键缺失、类型转换失败、或值为零值时返回错误
 // 比 Extract 更严格：除了缺失/null/类型不对之外，零值（0、""、false）也会报错
 func Solicit[T comparable](object *simplejson.Json, key string) (T, error) {
 	res, err := Extract[T](object, key)
@@ -58,11 +66,9 @@ func Solicit[T comparable](object *simplejson.Json, key string) (T, error) {
 
 // Inspect retrieves and parses the value at the specified key when present
 // Returns zero value without errors when key is absent, errors on conversion failures
-// Provides lenient access patterns that accept fields in JSON data
 //
 // Inspect 检索并解析指定键的值（当键存在时）
 // 当键不存在时返回零值且不报错，仅在转换失败时返回错误
-// 提供宽松的访问模式，允许 JSON 结构中存在可选字段
 func Inspect[T any](object *simplejson.Json, key string) (T, error) {
 	if object == nil {
 		return utils.Zero[T](), errors.New("Inspect: param object is nil")
@@ -83,14 +89,14 @@ func Inspect[T any](object *simplejson.Json, key string) (T, error) {
 // Resolve extracts and converts JSON value into the target type
 // Supports comprehensive type conversion via simplejson.Json methods
 // Handles primitives (int, int64, float64, string, uint64, bool)
-// Handles arrays ([]string, []interface{}, []*simplejson.Json)
-// Handles complex types (map[string]interface{}, []byte, *simplejson.Json)
+// Handles arrays ([]string, []any, []*simplejson.Json)
+// Handles complex types (map[string]any, []byte, *simplejson.Json)
 //
 // Resolve 提取 JSON 值并转换成目标类型
 // 支持使用 simplejson.Json 方法进行全面的类型转换
 // 处理基础类型（int、int64、float64、string、uint64、bool）
-// 处理数组类型（[]string、[]interface{}、[]*simplejson.Json）
-// 处理复杂类型（map[string]interface{}、[]byte、*simplejson.Json）
+// 处理数组类型（[]string、[]any、[]*simplejson.Json）
+// 处理复杂类型（map[string]any、[]byte、*simplejson.Json）
 func Resolve[T any](object *simplejson.Json) (T, error) {
 	if object == nil {
 		return utils.Zero[T](), errors.New("Resolve: param object is nil")
@@ -102,61 +108,61 @@ func Resolve[T any](object *simplejson.Json) (T, error) {
 	case int:
 		res, err := object.Int()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to int")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to int")
 		}
 		return any(res).(T), nil
 	case int64:
 		res, err := object.Int64()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to int64")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to int64")
 		}
 		return any(res).(T), nil
 	case float64:
 		res, err := object.Float64()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to float64")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to float64")
 		}
 		return any(res).(T), nil
 	case string:
 		res, err := object.String()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to string")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to string")
 		}
 		return any(res).(T), nil
 	case uint64:
 		res, err := object.Uint64()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to uint64")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to uint64")
 		}
 		return any(res).(T), nil
 	case bool:
 		res, err := object.Bool()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to bool")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to bool")
 		}
 		return any(res).(T), nil
 	case []string:
 		res, err := object.StringArray()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to []string")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to []string")
 		}
 		return any(res).(T), nil
-	case []interface{}:
+	case []any:
 		res, err := object.Array()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to []interface{}")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to []any")
 		}
 		return any(res).(T), nil
-	case map[string]interface{}:
+	case map[string]any:
 		res, err := object.Map()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to map[string]interface{}")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to map[string]any")
 		}
 		return any(res).(T), nil
 	case []byte:
 		res, err := object.Bytes()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to []byte")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to []byte")
 		}
 		return any(res).(T), nil
 	case *simplejson.Json:
@@ -164,33 +170,25 @@ func Resolve[T any](object *simplejson.Json) (T, error) {
 	case []*simplejson.Json:
 		elements, err := object.Array()
 		if err != nil {
-			return zero, errors.WithMessage(err, "unable to resolve JSON value to []interface{}")
+			return zero, errors.WithMessage(err, "Resolve: unable to resolve JSON value to []*simplejson.Json")
 		}
 		return any(List(elements)).(T), nil
 	default:
-		return zero, errors.Errorf("unsupported generic type: %T. unable to resolve JSON value.", zero)
+		return zero, errors.Errorf("Resolve: unsupported generic type %T, unable to resolve JSON value", zero)
 	}
 }
 
 // GetList retrieves JSON list at the specified key as simplejson.Json objects slice
-// Converts each list element into distinct simplejson.Json objects
-// Returns errors when key is missing, when value is not a list
+// The same as Extract[[]*simplejson.Json], with no type argument to write
 //
 // GetList 检索指定键的 JSON 数组并转换成 simplejson.Json 对象切片
-// 将每个数组元素转换成独立的 simplejson.Json 包装对象
-// 当键缺失或值不是数组时返回错误
+// 与 Extract[[]*simplejson.Json] 相同，只是不用写类型参数
 func GetList(object *simplejson.Json, key string) (objects []*simplejson.Json, err error) {
-	if object == nil {
-		return nil, errors.New("GetList: param object is nil")
-	}
-	if key == "" {
-		return nil, errors.New("GetList: param key is blank")
-	}
-	elements, err := object.Get(key).Array()
+	objects, err = Extract[[]*simplejson.Json](object, key)
 	if err != nil {
-		return objects, errors.WithMessage(err, "GetList: unable to get JSON elements as list")
+		return nil, errors.WithMessage(err, "GetList: unable to get JSON elements as list")
 	}
-	return List(elements), nil
+	return objects, nil
 }
 
 // Inquire queries JSON object at the specified key with tri-state result pattern
@@ -225,7 +223,7 @@ func Inquire[T any](object *simplejson.Json, key string) (T, bool, error) {
 
 // Attempt retrieves and parses value at the specified key with success indication
 // Returns parsed value and boolean indicating complete operation success
-// Without notification returns zero value and false on failures without exposing errors
+// Returns zero value and false on each failure, without the cause
 //
 // Attempt 检索并解析指定键的值，附带成功指示器
 // 返回解析后的值和表示整体操作成功的布尔值
@@ -264,7 +262,7 @@ func Explore[T any](object *simplejson.Json, path string) (T, bool, error) {
 	}
 	value := object
 	var exist bool
-	for _, key := range strings.Split(path, ".") {
+	for key := range strings.SplitSeq(path, ".") {
 		if _, err := value.Map(); err != nil {
 			return utils.Zero[T](), false, errors.Wrapf(err, "Explore: path %q segment %q requires a JSON object", path, key)
 		}
@@ -323,22 +321,16 @@ func Harvest[T any](object *simplejson.Json, key string, option *HarvestOption[T
 		}
 		return utils.Zero[T](), errors.Errorf("Harvest: key %q not found in JSON object", key)
 	}
-	if value == nil || value.Interface() == nil {
+	if value.Interface() == nil {
 		if option.Nullable {
 			return utils.Zero[T](), nil
 		}
 		return utils.Zero[T](), errors.Errorf("Harvest: key %q value is null in JSON object", key)
 	}
-	if option.Strconv != nil {
-		stringValue, err := value.String()
-		if err != nil {
-			res, err := Resolve[T](value)
-			if err != nil {
-				return utils.Zero[T](), errors.WithMessage(err, "Harvest: unable to resolve JSON value to target type")
-			}
-			return res, nil
-		}
-		res, err := option.Strconv(stringValue)
+	// A JSON string goes through the custom Strconv, the rest of the values go through Resolve
+	// JSON 字符串交给自定义的 Strconv，其余的值交给 Resolve
+	if text, isText := value.Interface().(string); isText && option.Strconv != nil {
+		res, err := option.Strconv(text)
 		if err != nil {
 			return utils.Zero[T](), errors.WithMessage(err, "Harvest: unable to convert string value using custom Strconv function")
 		}
@@ -347,6 +339,68 @@ func Harvest[T any](object *simplejson.Json, key string, option *HarvestOption[T
 	res, err := Resolve[T](value)
 	if err != nil {
 		return utils.Zero[T](), errors.WithMessage(err, "Harvest: unable to resolve JSON value to target type")
+	}
+	return res, nil
+}
+
+// NumericOption configures how Numeric treats absent keys, null values and strings meaning no value
+// The zero option is the strict one: the key must exist, null is not accepted, and each string must be numeric
+//
+// NumericOption 配置 Numeric 怎么对待缺键、null 值和表示没有值的字符串
+// 零值选项最严：键必须存在，不接受 null，字符串必须是数字
+type NumericOption struct {
+	AbsentOk bool     // Accept absent keys as zero values // 缺键时返回零值
+	Nullable bool     // Accept null values and nil objects as zero values, as HarvestOption does // null 值或 nil 对象返回零值，与 HarvestOption 一致
+	Blanks   []string // Strings meaning no value, such as "" and "N/A", read as zero values // 表示没有值的字符串，如 "" 和 "N/A"，读作零值
+}
+
+// Numeric reads numeric values that the JSON gives as JSON numbers / numeric strings, such as 9.5 and "9.5"
+// Option decides on absent keys, null values and the strings meaning no value
+//
+// Numeric 读取一个数字，JSON 里它可以是数字也可以是数字字符串，如 9.5 或 "9.5"
+// 选项决定缺键、null 值以及表示没有值的字符串怎么处理
+func Numeric[T int | int64 | uint64 | float64](object *simplejson.Json, key string, option *NumericOption) (T, error) {
+	if key == "" {
+		return utils.Zero[T](), errors.New("Numeric: param key is blank")
+	}
+	if option == nil {
+		option = &NumericOption{}
+	}
+	if object == nil {
+		if option.Nullable {
+			return utils.Zero[T](), nil
+		}
+		return utils.Zero[T](), errors.New("Numeric: param object is nil")
+	}
+	if _, err := object.Map(); err != nil {
+		return utils.Zero[T](), errors.Wrapf(err, "Numeric: key %q requires a JSON object", key)
+	}
+	value, exist := object.CheckGet(key)
+	if !exist {
+		if option.AbsentOk {
+			return utils.Zero[T](), nil
+		}
+		return utils.Zero[T](), errors.Errorf("Numeric: key %q not found in JSON object", key)
+	}
+	if value.Interface() == nil {
+		if option.Nullable {
+			return utils.Zero[T](), nil
+		}
+		return utils.Zero[T](), errors.Errorf("Numeric: key %q value is null in JSON object", key)
+	}
+	if text, isText := value.Interface().(string); isText {
+		if slices.Contains(option.Blanks, text) {
+			return utils.Zero[T](), nil
+		}
+		res, err := Strconv[T](value)
+		if err != nil {
+			return utils.Zero[T](), errors.WithMessagef(err, "Numeric: key %q string value %q is not numeric", key, text)
+		}
+		return res, nil
+	}
+	res, err := Resolve[T](value)
+	if err != nil {
+		return utils.Zero[T](), errors.WithMessagef(err, "Numeric: key %q value is not numeric", key)
 	}
 	return res, nil
 }

@@ -6,6 +6,7 @@
 [![Supported Go Versions](https://img.shields.io/badge/Go-1.26%2B-lightgrey.svg)](https://go.dev/)
 [![GitHub Release](https://img.shields.io/github/release/yylego/simplejsonx.svg)](https://github.com/yylego/simplejsonx/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/yylego/simplejsonx)](https://goreportcard.com/report/github.com/yylego/simplejsonx)
+
 <!-- TEMPLATE (ZH) CLOSE: BADGES -->
 
 # simplejsonx
@@ -353,11 +354,12 @@ fmt.Println("Address:", address)  // 输出: 空字符串（零值）
 
 ### 核心函数
 
-| 函数                           | 说明                                  |
-| ------------------------------ | ------------------------------------- |
-| `Load(data []byte)`            | 解析 JSON 字节为 simplejson.Json 实例 |
-| `Wrap(value interface{})`      | 包装 Go 值为 simplejson.Json 对象     |
-| `List(elements []interface{})` | 转换切片为 simplejson.Json 对象切片   |
+| 函数                           | 说明                                                 |
+| ------------------------------ | ---------------------------------------------------- |
+| `Load(data []byte)`            | 解析 JSON 字节为 simplejson.Json 实例                |
+| `LoadWithOption(data, option)` | 去掉指明的前缀 / 后缀（如 JSONP 回调）再按 JSON 解析 |
+| `Wrap(value any)`              | 包装 Go 值为 simplejson.Json 对象                    |
+| `List(elements []any)`         | 转换切片为 simplejson.Json 对象切片                  |
 
 ### 类型安全提取函数
 
@@ -378,6 +380,7 @@ fmt.Println("Address:", address)  // 输出: 空字符串（零值）
 | `GetList(object, key)`            | 获取指定键的 JSON 数组为 simplejson.Json 切片         |
 | `Explore[T](object, path)`        | 通过点分隔路径导航嵌套 JSON（如 "user.profile.name"） |
 | `Harvest[T](object, key, option)` | 提取混合类型字段，支持可配置的 null/字符串处理        |
+| `Numeric[T](object, key, option)` | 读取 JSON 数字或数字字符串，选项决定哪些情况读作零值  |
 | `Strconv[T](object)`              | 两阶段转换：JSON → 字符串 → 目标类型                  |
 
 ### 支持的类型
@@ -385,8 +388,8 @@ fmt.Println("Address:", address)  // 输出: 空字符串（零值）
 `Resolve` 和 `Extract` 支持以下类型：
 
 - **基础类型**：`int`、`int64`、`uint64`、`float64`、`string`、`bool`
-- **集合类型**：`[]string`、`[]interface{}`、`[]*simplejson.Json`
-- **复杂类型**：`map[string]interface{}`、`[]byte`、`*simplejson.Json`
+- **集合类型**：`[]string`、`[]any`、`[]*simplejson.Json`
+- **复杂类型**：`map[string]any`、`[]byte`、`*simplejson.Json`
 
 `type Amount int` 这样的定义类型不会按 `int` 解析；不支持的类型在运行时报错。`Wrap` 保留传入的 Go 值，不执行 JSON 编码。数值转换沿用 `go-simplejson`，包装后的浮点数转整数可能截断，整数转换可能溢出；`[]string` 转换会将 null 元素变成空字符串。`[]byte` 读取 JSON 字符串的字节，不做 Base64 解码。`Load` 要求输入为单个完整 JSON 文档，并通过 `json.Number` 保留数值。
 
@@ -401,6 +404,22 @@ fmt.Println("Address:", address)  // 输出: 空字符串（零值）
 | `Strconv`  | `func(string) (T, error)` | 自定义字符串到目标类型 T 的转换函数 |
 
 `AbsentOk` 与 `Nullable` 相互独立，同时启用才同时接受缺键和 null。option 为 nil 时使用严格默认配置；空键名和转换失败仍返回错误。`Nullable` 接受 Go 的 nil 对象；非 nil 对象按字段名取值时，其内容必须是 JSON 对象。
+
+### NumericOption 配置
+
+`NumericOption` 用于配置 `Numeric`，它读取以 JSON 数字或数字字符串给出的数字，如 `9.5` 和 `"9.5"`：
+
+| 字段       | 类型       | 说明                                                   |
+| ---------- | ---------- | ------------------------------------------------------ |
+| `AbsentOk` | `bool`     | 缺键时返回零值                                         |
+| `Nullable` | `bool`     | null 值或 nil 对象返回零值，与 `HarvestOption` 一致    |
+| `Blanks`   | `[]string` | 表示没有值的字符串，如 `""` 和 `"N/A"`，遇到时返回零值 |
+
+不传选项时最严：键必须存在，不接受 null，字符串必须是数字。
+
+```go
+price := simplejsonm.Numeric[float64](object, "price", &simplejsonx.NumericOption{Nullable: true, Blanks: []string{"", "N/A"}})
+```
 
 ### 使用 Strconv — 字符串转换
 
@@ -509,12 +528,3 @@ MIT 许可证 - 详见 [LICENSE](LICENSE)。
 **祝你用这个包编程愉快！** 🎉🎉🎉
 
 <!-- TEMPLATE (ZH) CLOSE: STANDARD PROJECT FOOTER -->
-
----
-
-<!-- TEMPLATE (ZH) BEGIN: GITHUB STARS -->
-
-## GitHub 标星点赞
-
-[![Stargazers](https://starchart.cc/yylego/simplejsonx.svg?variant=adaptive)](https://starchart.cc/yylego/simplejsonx)
-<!-- TEMPLATE (ZH) CLOSE: GITHUB STARS -->

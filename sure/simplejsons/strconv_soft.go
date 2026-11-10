@@ -1,6 +1,6 @@
 // Code generated using sure/sure_pkg_gen. DO NOT EDIT.
 // This file was auto generated via github.com/yylego/sure
-// Generated from: zero_tern.go:31 -> zerotern.VF[...]
+// Generated from: sure.gen_test.go:25 -> sure.TestGen
 // ========== SURE:DO-NOT-EDIT-SECTION:END ==========
 
 package simplejsons

@@ -1,6 +1,6 @@
 // Code generated using sure/sure_pkg_gen. DO NOT EDIT.
 // This file was auto generated via github.com/yylego/sure
-// Generated from: zero_tern.go:31 -> zerotern.VF[...]
+// Generated from: sure.gen_test.go:26 -> sure.TestGen
 // ========== SURE:DO-NOT-EDIT-SECTION:END ==========
 
 package simplejsonm
@@ -60,6 +60,12 @@ func Explore[T any](object *simplejson.Json, path string) (T, bool) {
 
 func Harvest[T any](object *simplejson.Json, key string, option *simplejsonx.HarvestOption[T]) T {
 	res0, err := simplejsonx.Harvest[T](object, key, option)
+	sure.Must(err)
+	return res0
+}
+
+func Numeric[T int | int64 | uint64 | float64](object *simplejson.Json, key string, option *simplejsonx.NumericOption) T {
+	res0, err := simplejsonx.Numeric[T](object, key, option)
 	sure.Must(err)
 	return res0
 }

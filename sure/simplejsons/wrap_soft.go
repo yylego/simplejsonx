@@ -1,6 +1,6 @@
 // Code generated using sure/sure_pkg_gen. DO NOT EDIT.
 // This file was auto generated via github.com/yylego/sure
-// Generated from: zero_tern.go:31 -> zerotern.VF[...]
+// Generated from: sure.gen_test.go:25 -> sure.TestGen
 // ========== SURE:DO-NOT-EDIT-SECTION:END ==========
 
 package simplejsons
@@ -17,12 +17,18 @@ func Load(data []byte) (object *simplejson.Json) {
 	return object
 }
 
-func Wrap(value interface{}) (object *simplejson.Json) {
+func LoadWithOption(data []byte, option *simplejsonx.LoadOption) (object *simplejson.Json) {
+	object, err := simplejsonx.LoadWithOption(data, option)
+	sure.Soft(err)
+	return object
+}
+
+func Wrap(value any) (object *simplejson.Json) {
 	object = simplejsonx.Wrap(value)
 	return object
 }
 
-func List(elements []interface{}) (objects []*simplejson.Json) {
+func List(elements []any) (objects []*simplejson.Json) {
 	objects = simplejsonx.List(elements)
 	return objects
 }

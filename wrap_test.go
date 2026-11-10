@@ -42,7 +42,7 @@ func TestLoad_EmptyInput(t *testing.T) {
 	require.NotNil(t, object)
 }
 
-func TestLoadCompleteJSON(t *testing.T) {
+func TestLoad_CompleteJSON(t *testing.T) {
 	// Reject a second document and an unmatched closing bracket.
 	// 拒绝拼接的第二个文档，以及末尾多出的右括号。
 	for _, data := range []string{`{} {}`, `{"amount":1}]`} {
@@ -56,10 +56,43 @@ func TestLoadCompleteJSON(t *testing.T) {
 	require.Equal(t, int64(9007199254740993), value)
 }
 
+// TestLoadWithOption tests LoadWithOption with a JSONP response, a JSON response and responses of the wrong shape
+// TestLoadWithOption 测试 LoadWithOption 遇到 JSONP 响应、纯 JSON 响应和形状不对的响应时的表现
+func TestLoadWithOption(t *testing.T) {
+	option := &simplejsonx.LoadOption{TrimPrefix: "callback(", TrimSuffix: ");"}
+
+	t.Run("jsonp-response", func(t *testing.T) {
+		// The prefix and the suffix come off once each, so the same text inside the JSON stays as it is
+		// 前缀、后缀各去掉一次，JSON 内容里同样的文字原样保留
+		object, err := simplejsonx.LoadWithOption([]byte("\n  callback({\"title\":\"callback(a);\"});\n"), option)
+		require.NoError(t, err)
+		title, err := simplejsonx.Extract[string](object, "title")
+		require.NoError(t, err)
+		require.Equal(t, "callback(a);", title)
+	})
+
+	t.Run("without-option", func(t *testing.T) {
+		object, err := simplejsonx.LoadWithOption([]byte(`{"title":"hello"}`), nil)
+		require.NoError(t, err)
+		title, err := simplejsonx.Extract[string](object, "title")
+		require.NoError(t, err)
+		require.Equal(t, "hello", title)
+	})
+
+	t.Run("wrong-shape", func(t *testing.T) {
+		// A web page in place of the JSONP response, a response without the suffix, and a broken JSON inside
+		// 拿到的是网页而不是 JSONP、缺了后缀、里面的 JSON 是坏的
+		for _, data := range []string{"<html>blocked</html>", `callback({"title":"hello"}`, `callback({"title":);`} {
+			_, err := simplejsonx.LoadWithOption([]byte(data), option)
+			require.Error(t, err, data)
+		}
+	})
+}
+
 // TestWrap tests Wrap function with map data structure
 // TestWrap 测试 Wrap 函数包装 map 数据结构
 func TestWrap(t *testing.T) {
-	value := map[string]interface{}{
+	value := map[string]any{
 		"key": "abc",
 	}
 

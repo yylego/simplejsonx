@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/bitly/go-simplejson"
@@ -38,6 +39,16 @@ func TestExtract_Mismatch(t *testing.T) {
 	t.Log(err)
 	t.Log(res)
 	require.Equal(t, 0, res)
+}
+
+// TestExtract_NotObject tests Extract on a JSON list, which has no keys to look up
+// TestExtract_NotObject 测试 Extract 遇到 JSON 数组，数组里没有键可查
+func TestExtract_NotObject(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`[1, 2, 3]`))
+	require.NoError(t, err)
+
+	_, err = simplejsonx.Extract[int](object, "age")
+	require.Error(t, err)
 }
 
 // TestSolicit_NonZeroInt tests Solicit function returns non-zero int value
@@ -334,8 +345,8 @@ func TestResolve_StringArray(t *testing.T) {
 	require.Equal(t, []string{"a", "b", "c"}, res)
 }
 
-// TestResolve_Array tests Resolve function with []interface{} type
-// TestResolve_Array 测试 Resolve 函数的 []interface{} 类型转换
+// TestResolve_Array tests Resolve function with []any type
+// TestResolve_Array 测试 Resolve 函数的 []any 类型转换
 func TestResolve_Array(t *testing.T) {
 	t.Run("case-1", func(t *testing.T) {
 		object, err := simplejsonx.Load([]byte(`[
@@ -345,10 +356,10 @@ func TestResolve_Array(t *testing.T) {
 		]`))
 		require.NoError(t, err)
 
-		res, err := simplejsonx.Resolve[[]interface{}](object)
+		res, err := simplejsonx.Resolve[[]any](object)
 		require.NoError(t, err)
 		t.Log(res)
-		require.Equal(t, []interface{}{json.Number("1"), "two", json.Number("3.3")}, res)
+		require.Equal(t, []any{json.Number("1"), "two", json.Number("3.3")}, res)
 	})
 	t.Run("case-2", func(t *testing.T) {
 		var value any
@@ -362,10 +373,10 @@ func TestResolve_Array(t *testing.T) {
 
 		object := simplejsonx.Wrap(value)
 
-		res, err := simplejsonx.Resolve[[]interface{}](object)
+		res, err := simplejsonx.Resolve[[]any](object)
 		require.NoError(t, err)
 		t.Log(res)
-		require.Equal(t, []interface{}{json.Number("1"), "two", json.Number("3.3")}, res)
+		require.Equal(t, []any{json.Number("1"), "two", json.Number("3.3")}, res)
 	})
 	t.Run("case-3", func(t *testing.T) {
 		var a any
@@ -377,28 +388,28 @@ func TestResolve_Array(t *testing.T) {
 
 		object := simplejsonx.Wrap(a)
 
-		res, err := simplejsonx.Resolve[[]interface{}](object)
+		res, err := simplejsonx.Resolve[[]any](object)
 		require.NoError(t, err)
 		t.Log(res)
-		require.Equal(t, []interface{}{float64(1), "two", 3.3}, res)
+		require.Equal(t, []any{float64(1), "two", 3.3}, res)
 	})
 }
 
-// TestResolve_Map tests Resolve function with map[string]interface{} type
-// TestResolve_Map 测试 Resolve 函数的 map[string]interface{} 类型转换
+// TestResolve_Map tests Resolve function with map[string]any type
+// TestResolve_Map 测试 Resolve 函数的 map[string]any 类型转换
 func TestResolve_Map(t *testing.T) {
-	object := simplejsonx.Wrap(map[string]interface{}{"key": "value"})
+	object := simplejsonx.Wrap(map[string]any{"key": "value"})
 
-	res, err := simplejsonx.Resolve[map[string]interface{}](object)
+	res, err := simplejsonx.Resolve[map[string]any](object)
 	require.NoError(t, err)
 	t.Log(res)
-	require.Equal(t, map[string]interface{}{"key": "value"}, res)
+	require.Equal(t, map[string]any{"key": "value"}, res)
 }
 
 // TestResolve_Bytes tests Resolve function with []byte type
 // TestResolve_Bytes 测试 Resolve 函数的 []byte 类型转换
 func TestResolve_Bytes(t *testing.T) {
-	a := map[string]interface{}{
+	a := map[string]any{
 		"value": "abc",
 	}
 	data, err := json.Marshal(a)
@@ -444,6 +455,15 @@ func TestGetList(t *testing.T) {
 
 	t.Run("case-2", func(t *testing.T) {
 		objects, err := simplejsonx.GetList(object, "invalidKey")
+		require.Error(t, err)
+		require.Len(t, objects, 0)
+	})
+
+	t.Run("not-a-list", func(t *testing.T) {
+		item, err := simplejsonx.Load([]byte(`{"key": "text"}`))
+		require.NoError(t, err)
+
+		objects, err := simplejsonx.GetList(item, "key")
 		require.Error(t, err)
 		require.Len(t, objects, 0)
 	})
@@ -575,9 +595,9 @@ func TestExplore(t *testing.T) {
 	})
 }
 
-// TestExploreGetJson tests Explore function returning *simplejson.Json type
-// TestExploreGetJson 测试 Explore 函数返回 *simplejson.Json 类型
-func TestExploreGetJson(t *testing.T) {
+// TestExplore_GetJson tests Explore function returning *simplejson.Json type
+// TestExplore_GetJson 测试 Explore 函数返回 *simplejson.Json 类型
+func TestExplore_GetJson(t *testing.T) {
 	// Test success scenario with nested path
 	// 测试成功场景（嵌套路径）
 	object, err := simplejsonx.Load([]byte(`{
@@ -603,9 +623,9 @@ func TestExploreGetJson(t *testing.T) {
 	}
 }
 
-// TestExploreGetList tests Explore function returning []*simplejson.Json type
-// TestExploreGetList 测试 Explore 函数返回 []*simplejson.Json 类型
-func TestExploreGetList(t *testing.T) {
+// TestExplore_GetList tests Explore function returning []*simplejson.Json type
+// TestExplore_GetList 测试 Explore 函数返回 []*simplejson.Json 类型
+func TestExplore_GetList(t *testing.T) {
 	// Test success scenario with nested path
 	// 测试成功场景（嵌套路径）
 	object, err := simplejsonx.Load([]byte(`{
@@ -791,21 +811,41 @@ func TestHarvest_EmptyKey(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestFieldObjectShape(t *testing.T) {
+// TestInspect_NotObject tests Inspect on a JSON list, which has no keys to look up
+// TestInspect_NotObject 测试 Inspect 遇到 JSON 数组，数组没有键可查
+func TestInspect_NotObject(t *testing.T) {
 	object, err := simplejsonx.Load([]byte(`[]`))
 	require.NoError(t, err)
 	_, err = simplejsonx.Inspect[int](object, "amount")
 	require.Error(t, err)
+}
+
+// TestInquire_NotObject tests Inquire on a JSON list, which has no keys to look up
+// TestInquire_NotObject 测试 Inquire 遇到 JSON 数组，数组没有键可查
+func TestInquire_NotObject(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`[]`))
+	require.NoError(t, err)
 	_, _, err = simplejsonx.Inquire[int](object, "amount")
-	require.Error(t, err)
-	_, err = simplejsonx.Harvest[int](object, "amount", &simplejsonx.HarvestOption[int]{AbsentOk: true, Nullable: true})
-	require.Error(t, err)
-	_, _, err = simplejsonx.Explore[int](object, "amount")
 	require.Error(t, err)
 }
 
-func TestExploreObjectShape(t *testing.T) {
-	object, err := simplejsonx.Load([]byte(`{"item":42}`))
+// TestHarvest_NotObject tests Harvest on a JSON list, which the options do not accept
+// TestHarvest_NotObject 测试 Harvest 遇到 JSON 数组，选项放宽不了这种情况
+func TestHarvest_NotObject(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`[]`))
+	require.NoError(t, err)
+	_, err = simplejsonx.Harvest[int](object, "amount", &simplejsonx.HarvestOption[int]{AbsentOk: true, Nullable: true})
+	require.Error(t, err)
+}
+
+// TestExplore_NotObject tests Explore when a path segment lands on a list / numeric value in place of a JSON object
+// TestExplore_NotObject 测试 Explore 的某段路径落在数组或数字上，而不是 JSON 对象
+func TestExplore_NotObject(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`[]`))
+	require.NoError(t, err)
+	_, _, err = simplejsonx.Explore[int](object, "amount")
+	require.Error(t, err)
+	object, err = simplejsonx.Load([]byte(`{"item":42}`))
 	require.NoError(t, err)
 	_, _, err = simplejsonx.Explore[int](object, "item.amount")
 	require.Error(t, err)
@@ -814,4 +854,99 @@ func TestExploreObjectShape(t *testing.T) {
 	_, ok, err := simplejsonx.Explore[int](object, "item.amount")
 	require.NoError(t, err)
 	require.False(t, ok)
+}
+
+// TestHarvest_Absent tests Harvest with absent keys, JSON nulls and values that cannot be parsed
+// TestHarvest_Absent 测试 Harvest 遇到缺失的键、JSON null 和解析不了的值时的表现
+func TestHarvest_Absent(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{"null":null,"zero":0,"text":"12","bad":"oops"}`))
+	require.NoError(t, err)
+	opt := &simplejsonx.HarvestOption[int]{AbsentOk: true, Strconv: strconv.Atoi}
+	value, err := simplejsonx.Harvest(object, "absent", opt)
+	require.NoError(t, err)
+	require.Zero(t, value)
+	_, err = simplejsonx.Harvest(object, "null", opt)
+	require.Error(t, err)
+	_, err = simplejsonx.Harvest[int](nil, "absent", opt)
+	require.Error(t, err)
+	opt.Nullable = true
+	value, err = simplejsonx.Harvest(object, "null", opt)
+	require.NoError(t, err)
+	require.Zero(t, value)
+	value, err = simplejsonx.Harvest(object, "text", opt)
+	require.NoError(t, err)
+	require.Equal(t, 12, value)
+	_, err = simplejsonx.Harvest(object, "bad", opt)
+	require.Error(t, err)
+	_, err = simplejsonx.Harvest(object, "", opt)
+	require.Error(t, err)
+	_, err = simplejsonx.Harvest[int](object, "absent", nil)
+	require.Error(t, err)
+	value, err = simplejsonx.Harvest[int](object, "zero", nil)
+	require.NoError(t, err)
+	require.Zero(t, value)
+	_, err = simplejsonx.Harvest[int](nil, "absent", nil)
+	require.Error(t, err)
+	value, err = simplejsonx.Harvest[int](nil, "absent", &simplejsonx.HarvestOption[int]{Nullable: true})
+	require.NoError(t, err)
+	require.Zero(t, value)
+	_, err = simplejsonx.Harvest[int](object, "absent", &simplejsonx.HarvestOption[int]{Nullable: true})
+	require.Error(t, err)
+}
+
+// TestNumeric tests Numeric with JSON numbers, numeric strings, null, strings meaning no value and bad values
+// TestNumeric 测试 Numeric 遇到数字、数字字符串、null、占位字符串和坏值时的表现
+func TestNumeric(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"views": 1200,
+		"price": "9.5",
+		"rating": null,
+		"discount": "",
+		"weight": "N/A",
+		"title": "hello"
+	}`))
+	require.NoError(t, err)
+
+	t.Run("numeric-value-and-numeric-string", func(t *testing.T) {
+		views, err := simplejsonx.Numeric[int](object, "views", nil)
+		require.NoError(t, err)
+		require.Equal(t, 1200, views)
+
+		price, err := simplejsonx.Numeric[float64](object, "price", nil)
+		require.NoError(t, err)
+		require.Equal(t, 9.5, price)
+	})
+
+	t.Run("strict-without-option", func(t *testing.T) {
+		for _, key := range []string{"rating", "discount", "weight", "title", "absent"} {
+			_, err := simplejsonx.Numeric[float64](object, key, nil)
+			require.Error(t, err, key)
+		}
+		// "9.5" is numeric, yet not an int
+		// "9.5" 是数字，但不是整数
+		_, err := simplejsonx.Numeric[int](object, "price", nil)
+		require.Error(t, err)
+	})
+
+	t.Run("option-accepts-what-it-names", func(t *testing.T) {
+		option := &simplejsonx.NumericOption{AbsentOk: true, Nullable: true, Blanks: []string{"", "N/A"}}
+		for _, key := range []string{"rating", "discount", "weight", "absent"} {
+			value, err := simplejsonx.Numeric[float64](object, key, option)
+			require.NoError(t, err, key)
+			require.Zero(t, value, key)
+		}
+		// A bad value stays an error even with each option on
+		// 选项全开时坏值照样报错
+		_, err := simplejsonx.Numeric[float64](object, "title", option)
+		require.Error(t, err)
+	})
+
+	t.Run("nil-object-follows-nullable", func(t *testing.T) {
+		_, err := simplejsonx.Numeric[float64](nil, "views", nil)
+		require.Error(t, err)
+
+		value, err := simplejsonx.Numeric[float64](nil, "views", &simplejsonx.NumericOption{Nullable: true})
+		require.NoError(t, err)
+		require.Zero(t, value)
+	})
 }

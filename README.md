@@ -6,6 +6,7 @@
 [![Supported Go Versions](https://img.shields.io/badge/Go-1.26%2B-lightgrey.svg)](https://go.dev/)
 [![GitHub Release](https://img.shields.io/github/release/yylego/simplejsonx.svg)](https://github.com/yylego/simplejsonx/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/yylego/simplejsonx)](https://goreportcard.com/report/github.com/yylego/simplejsonx)
+
 <!-- TEMPLATE (EN) CLOSE: BADGES -->
 
 # simplejsonx
@@ -353,11 +354,12 @@ fmt.Println("Address:", address)  // Output: Blank string (zero value)
 
 ### Core Functions
 
-| Function                       | Description                                    |
-| ------------------------------ | ---------------------------------------------- |
-| `Load(data []byte)`            | Parse JSON bytes into simplejson.Json instance |
-| `Wrap(value interface{})`      | Wrap Go value as simplejson.Json object        |
-| `List(elements []interface{})` | Convert slice to simplejson.Json objects slice |
+| Function                       | Description                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| `Load(data []byte)`            | Parse JSON bytes into simplejson.Json instance                                |
+| `LoadWithOption(data, option)` | Trim the named prefix / suffix (such as a JSONP callback), then parse as JSON |
+| `Wrap(value any)`              | Wrap Go value as simplejson.Json object                                       |
+| `List(elements []any)`         | Convert slice to simplejson.Json objects slice                                |
 
 ### Type-Safe Extraction Functions
 
@@ -373,20 +375,21 @@ fmt.Println("Address:", address)  // Output: Blank string (zero value)
 
 ### Advanced Functions
 
-| Function                          | Description                                                             |
-| --------------------------------- | ----------------------------------------------------------------------- |
-| `GetList(object, key)`            | Get JSON list at key as simplejson.Json slice                           |
-| `Explore[T](object, path)`        | Navigate nested JSON via dot-separated path (e.g., "user.profile.name") |
-| `Harvest[T](object, key, option)` | Extract mixed-type fields with configurable null/string handling        |
-| `Strconv[T](object)`              | Two-stage conversion: JSON → string → target type                       |
+| Function                          | Description                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------- |
+| `GetList(object, key)`            | Get JSON list at key as simplejson.Json slice                                         |
+| `Explore[T](object, path)`        | Navigate nested JSON via dot-separated path (e.g., "user.profile.name")               |
+| `Harvest[T](object, key, option)` | Extract mixed-type fields with configurable null/string handling                      |
+| `Numeric[T](object, key, option)` | Read numbers from JSON numbers / numeric strings; the option names what reads as zero |
+| `Strconv[T](object)`              | Two-stage conversion: JSON → string → target type                                     |
 
 ### Supported Types
 
 `Resolve` and `Extract` support these types:
 
 - **Primitives**: `int`, `int64`, `uint64`, `float64`, `string`, `bool`
-- **Collections**: `[]string`, `[]interface{}`, `[]*simplejson.Json`
-- **Complex**: `map[string]interface{}`, `[]byte`, `*simplejson.Json`
+- **Collections**: `[]string`, `[]any`, `[]*simplejson.Json`
+- **Complex**: `map[string]any`, `[]byte`, `*simplejson.Json`
 
 Defined types such as `type Amount int` are not resolved as `int`; unsupported types produce runtime errors. `Wrap` keeps Go values as supplied, without JSON encoding. Numeric conversions follow `go-simplejson` and can truncate wrapped floats / overflow integer conversions; `[]string` conversion maps null elements to blank strings. `[]byte` reads a JSON string as bytes, without Base64 decoding. `Load` requires one complete JSON document and preserves numbers via `json.Number`.
 
@@ -401,6 +404,22 @@ Defined types such as `type Amount int` are not resolved as `int`; unsupported t
 | `Strconv`  | `func(string) (T, error)` | Custom string-to-T conversion function                        |
 
 `AbsentOk` and `Nullable` are independent. Enable both to accept absent keys and null values. A nil option uses strict defaults; blank keys and conversion errors remain invalid. `Nullable` accepts a nil Go object; a non-nil object used with a field name must contain a JSON object.
+
+### NumericOption Configuration
+
+`NumericOption` configures `Numeric`, which reads numbers given as JSON numbers / numeric strings, such as `9.5` and `"9.5"`:
+
+| Field      | Type       | Description                                                                |
+| ---------- | ---------- | -------------------------------------------------------------------------- |
+| `AbsentOk` | `bool`     | Accept absent keys and return zero                                         |
+| `Nullable` | `bool`     | Accept null values and nil objects (returns zero), as `HarvestOption` does |
+| `Blanks`   | `[]string` | Strings meaning no value, such as `""` and `"N/A"`; each returns zero      |
+
+Leaving the option out is the strictest: the key must exist, null is not accepted, and each string must be numeric.
+
+```go
+price := simplejsonm.Numeric[float64](object, "price", &simplejsonx.NumericOption{Nullable: true, Blanks: []string{"", "N/A"}})
+```
 
 ### Using Strconv — String-Based Conversion
 
@@ -509,12 +528,3 @@ Welcome to contribute to this project via submitting merge requests and reportin
 **Have Fun Coding with this package!** 🎉🎉🎉
 
 <!-- TEMPLATE (EN) CLOSE: STANDARD PROJECT FOOTER -->
-
----
-
-<!-- TEMPLATE (EN) BEGIN: GITHUB STARS -->
-
-## GitHub Stars
-
-[![Stargazers](https://starchart.cc/yylego/simplejsonx.svg?variant=adaptive)](https://starchart.cc/yylego/simplejsonx)
-<!-- TEMPLATE (EN) CLOSE: GITHUB STARS -->
