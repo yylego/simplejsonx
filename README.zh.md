@@ -38,14 +38,14 @@ age := object.Get("age").MustInt(0)         // 0 是真实值，还是静默的�
 
 值得注意的是，Go 社区对 `Must` 的主流理解是"**必须成功，否则 panic**"——如 `template.Must()`、`regexp.MustCompile()` 等标准库函数均遵循此语义。而 `go-simplejson` 的 `Must` 含义与此相反——"尽量获取，做不到就用默认值"，更接近"尽力而为"而非"必须成功"。`simplejsonx` 的子包 `simplejsonm` 遵循 Go 主流语义：`Must` 即断言，失败即 panic。
 
-`simplejsonx` 采取相反的立场：**数据源为你服务。** 无需提供默认值并期望一切正常，而是**断言**每个字段必须是什么，代码会在出问题的那一刻立刻告诉你：
+`simplejsonx` 采取相反的立场：**数据源为你服务。** 无需提供默认值并期望一切正常，而是**断言**每个字段必须满足的类型，代码会在出问题的那一刻立刻告诉你：
 
 ```go
 name, err := simplejsonx.Extract[string](object, "name")  // 缺失/null/类型不对 → err
 age, err := simplejsonx.Extract[int](object, "age")        // 无需默认值，不会静默掩盖异常
 ```
 
-核心区别：`go-simplejson` 问的是"出错时我该返回什么？"而 `simplejsonx` 问的是"**这里该出错吗？**"
+核心区别：`go-simplejson` 问的是"出错时我该返回哪个值？"而 `simplejsonx` 问的是"**这里该出错吗？**"
 
 > **适用场景**：`simplejsonx` 的主要使用场景是对方返回的数据结构**不确定或可变**——同一个字段在不同业务条件下可能返回不同类型（如有时是数字，有时是字符串 `"-"`，有时是 null），字段可能随版本更新增减或重命名，且通常没有完善的开放文档。在这种情况下，需要逐字段提取并校验类型，主动检测数据变化，而非静默兜底。相比之下，`go-simplejson` 更适合数据结构已知且稳定的场景，开发者清楚每个字段的含义，可以放心使用默认值。
 
@@ -415,10 +415,25 @@ fmt.Println("Address:", address)  // 输出: 空字符串（零值）
 | `Nullable` | `bool`     | null 值或 nil 对象返回零值，与 `HarvestOption` 一致    |
 | `Blanks`   | `[]string` | 表示没有值的字符串，如 `""` 和 `"N/A"`，遇到时返回零值 |
 
-不传选项时最严：键必须存在，不接受 null，字符串必须是数字。
+不传选项时最严：键必须存在，不接受 null，字符串必须是数字。数字字符串按十进制读，如 `"-2"`、`"0.50"`、`"1e3"`；十六进制写法（`"0x1p-2"`）、数字分隔符（`"1_000"`）和 `"NaN"` / `"Inf"` 不算数字字符串。
 
 ```go
 price := simplejsonm.Numeric[float64](object, "price", &simplejsonx.NumericOption{Nullable: true, Blanks: []string{"", "N/A"}})
+```
+
+### LoadOption 配置
+
+`LoadOption` 用于配置 `LoadWithOption`，它读取外面包着固定文本的 JSON，如 JSONP 响应 `callback({...});`：
+
+| 字段         | 类型     | 说明                            |
+| ------------ | -------- | ------------------------------- |
+| `TrimPrefix` | `string` | JSON 前面的文本，如 `callback(` |
+| `TrimSuffix` | `string` | JSON 后面的文本，如 `);`        |
+
+先去掉首尾空白，再把指明的文本各去掉一次。形状不同的响应（如没带外壳的纯 JSON）会返回错误，这种响应用 `Load` 读取。
+
+```go
+object, err := simplejsonx.LoadWithOption(data, &simplejsonx.LoadOption{TrimPrefix: "callback(", TrimSuffix: ");"})
 ```
 
 ### 使用 Strconv — 字符串转换

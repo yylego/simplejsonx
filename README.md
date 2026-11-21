@@ -415,10 +415,25 @@ Defined types such as `type Amount int` are not resolved as `int`; unsupported t
 | `Nullable` | `bool`     | Accept null values and nil objects (returns zero), as `HarvestOption` does |
 | `Blanks`   | `[]string` | Strings meaning no value, such as `""` and `"N/A"`; each returns zero      |
 
-Leaving the option out is the strictest: the key must exist, null is not accepted, and each string must be numeric.
+Leaving the option out is the strictest: the key must exist, null is not accepted, and each string must be numeric. Numeric strings are read in base 10, such as `"-2"`, `"0.50"` and `"1e3"`; base-16 forms (`"0x1p-2"`), digit separators (`"1_000"`) and `"NaN"` / `"Inf"` do not count.
 
 ```go
 price := simplejsonm.Numeric[float64](object, "price", &simplejsonx.NumericOption{Nullable: true, Blanks: []string{"", "N/A"}})
+```
+
+### LoadOption Configuration
+
+`LoadOption` configures `LoadWithOption`, which reads JSON wrapped in fixed text, such as a JSONP response `callback({...});`:
+
+| Field        | Type     | Description                                    |
+| ------------ | -------- | ---------------------------------------------- |
+| `TrimPrefix` | `string` | Text in front of the JSON, such as `callback(` |
+| `TrimSuffix` | `string` | Text behind the JSON, such as `);`             |
+
+Each named text comes off once, with the surrounding whitespace trimmed first. A response of a different shape, such as JSON without the wrapping, returns an error; read that one with `Load`.
+
+```go
+object, err := simplejsonx.LoadWithOption(data, &simplejsonx.LoadOption{TrimPrefix: "callback(", TrimSuffix: ");"})
 ```
 
 ### Using Strconv — String-Based Conversion

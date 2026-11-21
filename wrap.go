@@ -28,7 +28,7 @@ func Load(data []byte) (object *simplejson.Json, err error) {
 // The code that calls it says what to trim, so Load does not have to guess the shape
 //
 // LoadOption 指明包在 JSON 外面的文本，如 JSONP 响应外面的 "callback(" 和 ");"
-// 由调用方说清要去掉什么，Load 不用去猜外壳的样子
+// 由调用方说清要去掉的外壳，Load 不用去猜外壳的样子
 type LoadOption struct {
 	TrimPrefix string // The prefix the data must have, trimmed once before parsing // 数据必须带的前缀，解析前去掉一次
 	TrimSuffix string // The suffix the data must have, trimmed once before parsing // 数据必须带的后缀，解析前去掉一次

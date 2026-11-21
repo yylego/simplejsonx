@@ -79,10 +79,36 @@ func TestLoadWithOption(t *testing.T) {
 		require.Equal(t, "hello", title)
 	})
 
+	t.Run("one-side-alone", func(t *testing.T) {
+		// An option with just the prefix leaves the end of the data as it is, and the same goes with just the suffix
+		// 只写前缀的选项不动数据的结尾，只写后缀的同理
+		object, err := simplejsonx.LoadWithOption([]byte(`callback=({"title":"hello"})`), &simplejsonx.LoadOption{TrimPrefix: "callback=("})
+		require.Error(t, err)
+		require.NotNil(t, object)
+
+		object, err = simplejsonx.LoadWithOption([]byte(`callback={"title":"hello"}`), &simplejsonx.LoadOption{TrimPrefix: "callback="})
+		require.NoError(t, err)
+		title, err := simplejsonx.Extract[string](object, "title")
+		require.NoError(t, err)
+		require.Equal(t, "hello", title)
+
+		object, err = simplejsonx.LoadWithOption([]byte(`{"title":"hello"};`), &simplejsonx.LoadOption{TrimSuffix: ";"})
+		require.NoError(t, err)
+		title, err = simplejsonx.Extract[string](object, "title")
+		require.NoError(t, err)
+		require.Equal(t, "hello", title)
+	})
+
 	t.Run("wrong-shape", func(t *testing.T) {
 		// A web page in place of the JSONP response, a response without the suffix, and a broken JSON inside
 		// 拿到的是网页而不是 JSONP、缺了后缀、里面的 JSON 是坏的
 		for _, data := range []string{"<html>blocked</html>", `callback({"title":"hello"}`, `callback({"title":);`} {
+			_, err := simplejsonx.LoadWithOption([]byte(data), option)
+			require.Error(t, err, data)
+		}
+		// A JSON response without the wrapping, the suffix without the prefix, nothing inside, and the wrapping put on twice
+		// 没带外壳的纯 JSON、有后缀没前缀、外壳里面是空的、外壳套了两层
+		for _, data := range []string{`{"title":"hello"}`, `{"title":"hello"});`, `callback();`, `callback(callback({"title":"hello"}););`, ``} {
 			_, err := simplejsonx.LoadWithOption([]byte(data), option)
 			require.Error(t, err, data)
 		}

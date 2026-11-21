@@ -94,7 +94,7 @@ func TestSolicit_EmptyString(t *testing.T) {
 }
 
 // TestSolicit_NonZeroString tests Solicit function returns non-empty string value
-// TestSolicit_NonZeroString ��试 Solicit 函数返回非空字符串值
+// TestSolicit_NonZeroString 测试 Solicit 函数返回非空字符串值
 func TestSolicit_NonZeroString(t *testing.T) {
 	object, err := simplejsonx.Load([]byte(`{
 		"name": "yylego"
@@ -122,7 +122,7 @@ func TestSolicit_FalseBool(t *testing.T) {
 }
 
 // TestSolicit_MissingKey tests Solicit function rejects missing key
-// TestSolicit_MissingKey ����� Solicit 函数拒绝缺失的键
+// TestSolicit_MissingKey 测试 Solicit 函数拒绝缺失的键
 func TestSolicit_MissingKey(t *testing.T) {
 	object, err := simplejsonx.Load([]byte(`{
 		"name": "yylego"
@@ -880,17 +880,24 @@ func TestHarvest_Absent(t *testing.T) {
 	require.Error(t, err)
 	_, err = simplejsonx.Harvest(object, "", opt)
 	require.Error(t, err)
-	_, err = simplejsonx.Harvest[int](object, "absent", nil)
+	_, err = simplejsonx.Harvest[int](object, "absent", &simplejsonx.HarvestOption[int]{})
 	require.Error(t, err)
-	value, err = simplejsonx.Harvest[int](object, "zero", nil)
+	value, err = simplejsonx.Harvest[int](object, "zero", &simplejsonx.HarvestOption[int]{})
 	require.NoError(t, err)
 	require.Zero(t, value)
-	_, err = simplejsonx.Harvest[int](nil, "absent", nil)
+	_, err = simplejsonx.Harvest[int](nil, "absent", &simplejsonx.HarvestOption[int]{})
 	require.Error(t, err)
 	value, err = simplejsonx.Harvest[int](nil, "absent", &simplejsonx.HarvestOption[int]{Nullable: true})
 	require.NoError(t, err)
 	require.Zero(t, value)
 	_, err = simplejsonx.Harvest[int](object, "absent", &simplejsonx.HarvestOption[int]{Nullable: true})
+	require.Error(t, err)
+	// A nil option reads the same as the zero option
+	// 选项传 nil 与传零值选项相同
+	value, err = simplejsonx.Harvest[int](object, "zero", nil)
+	require.NoError(t, err)
+	require.Zero(t, value)
+	_, err = simplejsonx.Harvest[int](object, "null", nil)
 	require.Error(t, err)
 }
 
@@ -908,23 +915,23 @@ func TestNumeric(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("numeric-value-and-numeric-string", func(t *testing.T) {
-		views, err := simplejsonx.Numeric[int](object, "views", nil)
+		views, err := simplejsonx.Numeric[int](object, "views", &simplejsonx.NumericOption{})
 		require.NoError(t, err)
 		require.Equal(t, 1200, views)
 
-		price, err := simplejsonx.Numeric[float64](object, "price", nil)
+		price, err := simplejsonx.Numeric[float64](object, "price", &simplejsonx.NumericOption{})
 		require.NoError(t, err)
 		require.Equal(t, 9.5, price)
 	})
 
-	t.Run("strict-without-option", func(t *testing.T) {
+	t.Run("strict-default-option", func(t *testing.T) {
 		for _, key := range []string{"rating", "discount", "weight", "title", "absent"} {
-			_, err := simplejsonx.Numeric[float64](object, key, nil)
+			_, err := simplejsonx.Numeric[float64](object, key, &simplejsonx.NumericOption{})
 			require.Error(t, err, key)
 		}
 		// "9.5" is numeric, yet not an int
 		// "9.5" 是数字，但不是整数
-		_, err := simplejsonx.Numeric[int](object, "price", nil)
+		_, err := simplejsonx.Numeric[int](object, "price", &simplejsonx.NumericOption{})
 		require.Error(t, err)
 	})
 
@@ -942,11 +949,186 @@ func TestNumeric(t *testing.T) {
 	})
 
 	t.Run("nil-object-follows-nullable", func(t *testing.T) {
-		_, err := simplejsonx.Numeric[float64](nil, "views", nil)
+		_, err := simplejsonx.Numeric[float64](nil, "views", &simplejsonx.NumericOption{})
 		require.Error(t, err)
 
 		value, err := simplejsonx.Numeric[float64](nil, "views", &simplejsonx.NumericOption{Nullable: true})
 		require.NoError(t, err)
 		require.Zero(t, value)
+	})
+
+	t.Run("without-option", func(t *testing.T) {
+		// A nil option reads the same as the zero option
+		// 选项传 nil 与传零值选项相同
+		views, err := simplejsonx.Numeric[int](object, "views", nil)
+		require.NoError(t, err)
+		require.Equal(t, 1200, views)
+
+		_, err = simplejsonx.Numeric[float64](object, "rating", nil)
+		require.Error(t, err)
+	})
+}
+
+// TestNumeric_Mismatch tests Numeric with each numeric type, values of the wrong type, values out of range and a wrong object shape
+// TestNumeric_Mismatch 测试 Numeric 的各个数字类型，以及类型不符、超出范围的值和形状不对的对象
+func TestNumeric_Mismatch(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"count": 42,
+		"count_text": "42",
+		"minus": -1,
+		"minus_text": "-1",
+		"ratio": 0.5,
+		"huge": 99999999999999999999,
+		"huge_text": "99999999999999999999",
+		"active": true,
+		"tags": [1, 2],
+		"extra": {"id": 1},
+		"padded": " 42",
+		"nan": "NaN",
+		"inf": "-Inf"
+	}`))
+	require.NoError(t, err)
+	option := &simplejsonx.NumericOption{AbsentOk: true, Nullable: true, Blanks: []string{""}}
+
+	t.Run("each-numeric-type", func(t *testing.T) {
+		count64, err := simplejsonx.Numeric[int64](object, "count", option)
+		require.NoError(t, err)
+		require.Equal(t, int64(42), count64)
+
+		countU64, err := simplejsonx.Numeric[uint64](object, "count_text", option)
+		require.NoError(t, err)
+		require.Equal(t, uint64(42), countU64)
+
+		minus, err := simplejsonx.Numeric[int](object, "minus_text", option)
+		require.NoError(t, err)
+		require.Equal(t, -1, minus)
+
+		ratio, err := simplejsonx.Numeric[float64](object, "ratio", option)
+		require.NoError(t, err)
+		require.Equal(t, 0.5, ratio)
+	})
+
+	t.Run("wrong-type", func(t *testing.T) {
+		// A boolean, a list, a JSON object and a string with a space in front are not numeric
+		// 布尔值、数组、JSON 对象和前面带空格的字符串都不是数字
+		for _, key := range []string{"active", "tags", "extra", "padded"} {
+			_, err := simplejsonx.Numeric[float64](object, key, option)
+			require.Error(t, err, key)
+		}
+		// 0.5 is numeric, yet not an int
+		// 0.5 是数字，但不是整数
+		_, err := simplejsonx.Numeric[int](object, "ratio", option)
+		require.Error(t, err)
+	})
+
+	t.Run("out-of-range", func(t *testing.T) {
+		for _, key := range []string{"huge", "huge_text"} {
+			_, err := simplejsonx.Numeric[int64](object, key, option)
+			require.Error(t, err, key)
+			_, err = simplejsonx.Numeric[uint64](object, key, option)
+			require.Error(t, err, key)
+		}
+		for _, key := range []string{"minus", "minus_text"} {
+			_, err := simplejsonx.Numeric[uint64](object, key, option)
+			require.Error(t, err, key)
+		}
+	})
+
+	t.Run("not-finite", func(t *testing.T) {
+		// JSON has no NaN / Inf, so such strings do not count as numeric strings
+		// JSON 里没有 NaN 和 Inf，这类字符串不算数字字符串
+		for _, key := range []string{"nan", "inf"} {
+			_, err := simplejsonx.Numeric[float64](object, key, option)
+			require.Error(t, err, key)
+		}
+	})
+
+	t.Run("options-keep-the-shape-checks", func(t *testing.T) {
+		// A blank field name and a JSON list remain errors even with each option on
+		// 选项全开时，空的字段名和 JSON 数组照样报错
+		_, err := simplejsonx.Numeric[int](object, "", option)
+		require.Error(t, err)
+
+		items, err := simplejsonx.Load([]byte(`[]`))
+		require.NoError(t, err)
+		_, err = simplejsonx.Numeric[int](items, "count", option)
+		require.Error(t, err)
+	})
+}
+
+// TestNumeric_BaseTen tests which numeric strings Numeric reads: base 10 ones with a sign, a fraction, an exponent and zeros in front
+// TestNumeric_BaseTen 测试 Numeric 认哪些数字字符串：带正负号、小数、科学计数法、前导零的十进制写法
+func TestNumeric_BaseTen(t *testing.T) {
+	object, err := simplejsonx.Load([]byte(`{
+		"plus": "+1.5",
+		"plus_int": "+5",
+		"minus": "-2",
+		"fraction": "0.50",
+		"exponent": "1e3",
+		"zeros": "007",
+		"hex": "0x1p-2",
+		"hex_int": "0x10",
+		"separated": "1_000"
+	}`))
+	require.NoError(t, err)
+	option := &simplejsonx.NumericOption{}
+
+	t.Run("sign", func(t *testing.T) {
+		plus, err := simplejsonx.Numeric[float64](object, "plus", option)
+		require.NoError(t, err)
+		require.Equal(t, 1.5, plus)
+
+		plusInt, err := simplejsonx.Numeric[int](object, "plus_int", option)
+		require.NoError(t, err)
+		require.Equal(t, 5, plusInt)
+
+		minus, err := simplejsonx.Numeric[float64](object, "minus", option)
+		require.NoError(t, err)
+		require.Equal(t, -2.0, minus)
+
+		minusInt, err := simplejsonx.Numeric[int64](object, "minus", option)
+		require.NoError(t, err)
+		require.Equal(t, int64(-2), minusInt)
+	})
+
+	t.Run("fraction", func(t *testing.T) {
+		fraction, err := simplejsonx.Numeric[float64](object, "fraction", option)
+		require.NoError(t, err)
+		require.Equal(t, 0.5, fraction)
+	})
+
+	t.Run("exponent", func(t *testing.T) {
+		exponent, err := simplejsonx.Numeric[float64](object, "exponent", option)
+		require.NoError(t, err)
+		require.Equal(t, 1000.0, exponent)
+	})
+
+	t.Run("zeros-in-front", func(t *testing.T) {
+		zeros, err := simplejsonx.Numeric[float64](object, "zeros", option)
+		require.NoError(t, err)
+		require.Equal(t, 7.0, zeros)
+
+		zerosInt, err := simplejsonx.Numeric[int](object, "zeros", option)
+		require.NoError(t, err)
+		require.Equal(t, 7, zerosInt)
+
+		zerosU64, err := simplejsonx.Numeric[uint64](object, "zeros", option)
+		require.NoError(t, err)
+		require.Equal(t, uint64(7), zerosU64)
+	})
+
+	t.Run("not-base-ten", func(t *testing.T) {
+		// Base-16 forms and digit separators are errors with each numeric type
+		// 十六进制写法和数字分隔符，在每个数字类型下都报错
+		for _, key := range []string{"hex", "hex_int", "separated"} {
+			_, err := simplejsonx.Numeric[float64](object, key, option)
+			require.Error(t, err, key)
+			_, err = simplejsonx.Numeric[int](object, key, option)
+			require.Error(t, err, key)
+			_, err = simplejsonx.Numeric[int64](object, key, option)
+			require.Error(t, err, key)
+			_, err = simplejsonx.Numeric[uint64](object, key, option)
+			require.Error(t, err, key)
+		}
 	})
 }

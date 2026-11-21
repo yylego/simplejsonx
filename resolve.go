@@ -14,6 +14,7 @@
 package simplejsonx
 
 import (
+	"math"
 	"slices"
 	"strings"
 
@@ -356,9 +357,11 @@ type NumericOption struct {
 
 // Numeric reads numeric values that the JSON gives as JSON numbers / numeric strings, such as 9.5 and "9.5"
 // Option decides on absent keys, null values and the strings meaning no value
+// Numeric strings are read in base 10, such as "-2", "0.50" and "1e3"; base-16 forms, digit separators and NaN / Inf do not count
 //
 // Numeric 读取一个数字，JSON 里它可以是数字也可以是数字字符串，如 9.5 或 "9.5"
 // 选项决定缺键、null 值以及表示没有值的字符串怎么处理
+// 数字字符串按十进制读，如 "-2"、"0.50"、"1e3"；十六进制写法、数字分隔符和 NaN / Inf 不算数字字符串
 func Numeric[T int | int64 | uint64 | float64](object *simplejson.Json, key string, option *NumericOption) (T, error) {
 	if key == "" {
 		return utils.Zero[T](), errors.New("Numeric: param key is blank")
@@ -392,9 +395,19 @@ func Numeric[T int | int64 | uint64 | float64](object *simplejson.Json, key stri
 		if slices.Contains(option.Blanks, text) {
 			return utils.Zero[T](), nil
 		}
+		// strconv.ParseFloat also reads base-16 forms such as "0x1p-2" and digit separators such as "1_000"
+		// strconv.ParseFloat 还认十六进制写法（如 "0x1p-2"）和数字分隔符（如 "1_000"）
+		if strings.ContainsAny(text, "xX_") {
+			return utils.Zero[T](), errors.Errorf("Numeric: key %q string value %q is not written in base 10", key, text)
+		}
 		res, err := Strconv[T](value)
 		if err != nil {
 			return utils.Zero[T](), errors.WithMessagef(err, "Numeric: key %q string value %q is not numeric", key, text)
+		}
+		// strconv.ParseFloat reads "NaN" and "Inf" as float64 values, while JSON has no such numbers
+		// strconv.ParseFloat 会把 "NaN"、"Inf" 读成 float64 值，而 JSON 里没有这样的数字
+		if float, isFloat := any(res).(float64); isFloat && (math.IsNaN(float) || math.IsInf(float, 0)) {
+			return utils.Zero[T](), errors.Errorf("Numeric: key %q string value %q is not a finite value", key, text)
 		}
 		return res, nil
 	}
